@@ -1,0 +1,11 @@
+id,title,description,ingredients,cuisine,diet,time_minutes,popularity,url
+r001,Peruvian Spicy Chicken (Aji de Gallina),Creamy shredded chicken with aji amarillo,"chicken; aji amarillo; bread; milk; parmesan",peruvian,none,45,120,https://example.com/r001
+r002,Quick Vegan Tomato Pasta,Fast weeknight pasta with garlic and tomatoes,"pasta; tomato; garlic; olive oil; basil",italian,vegan,15,340,https://example.com/r002
+r003,Gluten-Free Lomo Saltado,Stir-fried beef with fries,"beef; potato; onion; tomato; gluten-free soy sauce",peruvian,gluten_free,30,210,https://example.com/r003
+r004,Vegetarian Tacos with Beans,Soft tacos with spiced beans,"tortilla; black beans; cumin; onion; salsa",mexican,vegetarian,20,180,https://example.com/r004
+r005,Keto Garlic Shrimp,Zesty shrimp skillet,"shrimp; garlic; butter; lemon; parsley",american,keto,12,260,https://example.com/r005
+r006,Vegan Lentil Soup,Comforting lentil soup,"lentils; onion; carrot; celery; cumin",mediterranean,vegan,35,400,https://example.com/r006
+r007,Spicy Chili con Carne,Classic chili with kick,"ground beef; chili powder; beans; tomato",american,none,60,500,https://example.com/r007
+r008,Peruvian Ceviche,Fresh fish cured in lime,"white fish; lime; red onion; cilantro; aji limo",peruvian,gluten_free,25,520,https://example.com/r008
+r009,Vegetarian Margherita Pizza,Simple pizza with mozzarella,"pizza dough; tomato; mozzarella; basil",italian,vegetarian,25,480,https://example.com/r009
+r010,Gluten-Free Chicken Tacos,Easy tacos with corn tortillas,"chicken; corn tortilla; salsa; onion; cilantro",mexican,gluten_free,20,310,https://example.com/r010
