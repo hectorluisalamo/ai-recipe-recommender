@@ -63,9 +63,17 @@ if run:
     else:
         try:
             url, payload, r, dt_ms = call_api()
+
+            # Guard: we expect an httpx.Response, not an int
+            if not hasattr(r, 'status_code'):
+                st.error(f'Internal UI bug: expected httpx.Response, got {type(r).__name__}')
+                st.text(str(r)[:200])
+                st.stop()
+
+            # Always show what we called
             st.info(f'POST {url} → {r.status_code}')
-            
-            # Expandable debug panel with payload & first part of response
+
+            # Debug panel
             with st.expander('Debug request', expanded=False):
                 st.code(f'POST {url}\n\nPayload:\n{payload}', language='bash')
                 st.write('Status:', r.status_code)
@@ -73,16 +81,21 @@ if run:
 
             if r.status_code == 200:
                 data = r.json()
-                st.success(f'{len(data['results'])} results • server {data['latency_ms']} ms • client {dt_ms} ms • model {data['used_model']}')
+                st.success(
+                    f'{len(data["results"])} results • '
+                    f'server {data["latency_ms"]} ms • client {dt_ms} ms • '
+                    f'model {data["used_model"]}'
+                )
                 for i, rec in enumerate(data['results'], start=1):
                     with st.container(border=True):
-                        st.markdown(f'**{i}. {rec['title']}**  \nScore: `{rec['score']:.3f}`')
+                        st.markdown(f'**{i}. {rec["title"]}**  \nScore: `{rec["score"]:.3f}`')
                         if rec.get('url'):
                             st.write(rec['url'])
                         if rec.get('reasons'):
                             st.caption(' • '.join(rec['reasons']))
             else:
-                st.error(f'Error {r.status_code}')
+                st.error(f'Error {r.status_code}: {r.text[:160]}')
+
         except Exception as e:
             st.error(f'API request failed: {e}')
             st.caption('Is the API URL correct and running?')
