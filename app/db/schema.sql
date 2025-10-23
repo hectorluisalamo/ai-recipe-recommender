@@ -15,5 +15,5 @@ CREATE TABLE IF NOT EXISTS feedback (
   recipe_id TEXT,
   query TEXT,
   is_relevant INTEGER CHECK (is_relevant IN (0,1)),
-  ts DATETIME DEFAULT CURRENT_TIMESTAMP
+  timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
 );

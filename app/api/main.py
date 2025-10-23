@@ -8,8 +8,6 @@ except Exception:
 from fastapi import FastAPI
 import os
 from fastapi.middleware.cors import CORSMiddleware
-from slowapi.errors import RateLimitExceeded
-from slowapi import _rate_limit_exceeded_handler
 from prometheus_fastapi_instrumentator import Instrumentator
 
 from app.api.routers.system import router as system_router
@@ -35,10 +33,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# attach SlowAPI global handler
-app.state.limiter = getattr(recommend_router, 'limiter', None)
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # include routers
 app.include_router(system_router)

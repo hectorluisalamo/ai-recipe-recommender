@@ -12,7 +12,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends build-essential
 
 # Install Python deps
 COPY requirements.txt .
-RUN pip install -r requirements.txt
+RUN python -m pip install --upgrade pip setuptools wheel
+RUN python -m pip install --only-binary=:all: --prefer-binary \
+    numpy==2.0.2 scipy==1.13.1 scikit-learn==1.5.2
+RUN python -m pip install -r requirements.txt
 
 # App code
 COPY . .
@@ -24,8 +27,5 @@ USER root
 EXPOSE 8000
 HEALTHCHECK CMD curl -fsS http://localhost:8000/health || exit 1
 
-EXPOSE 8000
-HEALTHCHECK --interval=30s --timeout=3s --retries=3 CMD curl -fsS http://localhost:8000/health || exit 1
-
 # Default CMD is API; UI service overrides command in render.yaml
-CMD ["bash","-lc","/app/infra/entrypoint.sh"]
+CMD CMD ["bash","-lc","infra/entrypoint.sh && uvicorn app.api.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
