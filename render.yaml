@@ -5,22 +5,9 @@ services:
     plan: free
     healthCheckPath: /health
     autoDeploy: true
-    buildCommand: ""
-    # use Dockerfile CMD for API (no dockerCommand override needed)
+    dockerfilePath: Dockerfile.api
     envVars:
       - key: APP_ENV
         value: "prod"
-      # DB lives in /tmp on free tier; entrypoint sets DB_URL if not provided
       - key: DATA_DIR
         value: "/tmp"
-
-  - type: web
-    name: recipe-ui
-    env: docker
-    plan: free
-    autoDeploy: true
-    buildCommand: ""
-    dockerCommand: bash -lc "streamlit run ui/app.py --server.port $PORT --server.address 0.0.0.0"
-    envVars:
-      - key: API_URL
-        value: "http://localhost:8000"  # After API is live, change to the public API URL in the Render dashboard
