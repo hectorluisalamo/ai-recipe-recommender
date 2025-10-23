@@ -6,16 +6,13 @@ services:
     healthCheckPath: /health
     autoDeploy: true
     buildCommand: ""
-    startCommand: ""   # uses Dockerfile CMD
+    # use Dockerfile CMD for API (no dockerCommand override needed)
     envVars:
       - key: APP_ENV
         value: "prod"
-      - key: DB_URL
-        value: "sqlite:////data/recipes.db"
-    disk:
-      name: recipe-data
-      mountPath: /data
-      sizeGB: 1
+      # DB lives in /tmp on free tier; entrypoint sets DB_URL if not provided
+      - key: DATA_DIR
+        value: "/tmp"
 
   - type: web
     name: recipe-ui
@@ -23,8 +20,7 @@ services:
     plan: free
     autoDeploy: true
     buildCommand: ""
-    startCommand: bash -lc "streamlit run ui/app.py --server.port $PORT --server.address 0.0.0.0"
+    dockerCommand: bash -lc "streamlit run ui/app.py --server.port $PORT --server.address 0.0.0.0"
     envVars:
       - key: API_URL
-        # After the API is live, replace this with the API's public URL (e.g., https://recipe-api.onrender.com)
-        value: "http://localhost:8000"
+        value: "http://localhost:8000"  # After API is live, change to the public API URL in the Render dashboard
