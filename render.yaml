@@ -8,12 +8,12 @@ services:
     dockerfilePath: Dockerfile.api
     envVars:
       - key: APP_ENV
-        value: "prod"
+        value: 'prod'
       - key: DATA_DIR
-        value: "/tmp"
+        value: '/tmp'
       # IMPORTANT: set this after the UI is live (or now, if you know the UI URL)
       # - key: CORS_ALLOW_ORIGINS
-      #   value: "https://<your-ui>.onrender.com"
+      #   value: 'https://<your-ui>.onrender.com'
 
   - type: web
     name: recipe-ui
@@ -23,4 +23,4 @@ services:
     dockerfilePath: Dockerfile.ui
     envVars:
       - key: API_URL
-        value: "https://recipe-api-81x3.onrender.com"  # <-- put your live API URL here (no trailing slash)
+        value: 'https://recipe-api-81x3.onrender.com'  # <-- put your live API URL here (no trailing slash)

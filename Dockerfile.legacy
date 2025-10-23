@@ -28,4 +28,4 @@ EXPOSE 8000
 HEALTHCHECK CMD curl -fsS http://localhost:8000/health || exit 1
 
 # Default CMD is API; UI service overrides command in render.yaml
-CMD CMD ["bash","-lc","infra/entrypoint.sh && uvicorn app.api.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+CMD CMD ['bash','-lc','infra/entrypoint.sh && uvicorn app.api.main:app --host 0.0.0.0 --port ${PORT:-8000}']

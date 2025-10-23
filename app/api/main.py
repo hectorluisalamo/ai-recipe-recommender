@@ -16,22 +16,22 @@ from app.api.routers.recommend import router as recommend_router
 
 app = FastAPI(title='AI Recipe Recommender', version='0.0.3')
 
-Instrumentator().instrument(app).expose(app, endpoint="/metrics")
+Instrumentator().instrument(app).expose(app, endpoint='/metrics')
 
 DEFAULT_ORIGINS = [
-    "http://localhost", "http://127.0.0.1",
-    "http://localhost:3000", "http://127.0.0.1:3000",
-    "http://localhost:8501", "http://127.0.0.1:8501",  # Streamlit local
+    'http://localhost', 'http://127.0.0.1',
+    'http://localhost:3000', 'http://127.0.0.1:3000',
+    'http://localhost:8501', 'http://127.0.0.1:8501',  # Streamlit local
 ]
-env_origins = os.getenv("CORS_ALLOW_ORIGINS", "")
-allowed = [o.strip() for o in env_origins.split(",") if o.strip()] or DEFAULT_ORIGINS
+env_origins = os.getenv('CORS_ALLOW_ORIGINS', '')
+allowed = [o.strip() for o in env_origins.split(',') if o.strip()] or DEFAULT_ORIGINS
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=['*'],
+    allow_headers=['*'],
 )
 
 # include routers
