@@ -57,8 +57,10 @@ def recommend_keyword(query: str, diet: str, must_include: List[str], k: int) ->
         ingr_tokens = set(_tokenize(r['ingredients']))
         hits = sorted((qset & (title_tokens | ingr_tokens)))
         if not hits and qtokens:
-            continue
-        score = len(hits) + 0.0001 * float(r.get('popularity') or 0)
+            # fall back to popularity-only tiny signal
+            score = 0.0001 * float(r.get("popularity") or 0)
+        else:
+            score = len(hits) + 0.0001 * float(r.get("popularity") or 0)
         reasons = _build_reasons(hits or must_hits, diet, r.get('popularity') or 0)
         out.append({
             'id': r['id'],

@@ -72,6 +72,6 @@ async def _recommend_core(req: RecommendRequest) -> RecommendResponse:
     results = [RecipeOut(**r) for r in results_raw]
     return RecommendResponse(results=results, latency_ms=latency_ms, used_model=used)
 
-@router.post('/recommend', response_model=RecommendResponse)
+@router.post('')
 async def recommend(req: RecommendRequest, request: Request) -> RecommendResponse:
     return await _recommend_core(req)
