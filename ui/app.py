@@ -3,7 +3,7 @@ import httpx
 import streamlit as st
 from urllib.parse import urlparse
 
-DEFAULT_API = os.getenv('API_URL', 'http://127.0.0.1:8000')
+API = os.getenv('API_URL', 'http://127.0.0.1:8000')
 
 st.set_page_config(page_title='AI Recipe Recommender', page_icon='🥑', layout='centered')
 st.title('🥑 AI Recipe Recommender')
@@ -12,7 +12,7 @@ st.caption('Personalized recipe recommendations based on ingredients & diets')
 def normalize_base(url_text: str) -> str:
     raw = (url_text or '').strip()
     if not raw:
-        return DEFAULT_API
+        return API
     parsed = urlparse(raw)
     if not parsed.scheme:
         raw = 'http://' + raw
@@ -21,33 +21,21 @@ def normalize_base(url_text: str) -> str:
 
 with st.sidebar:
     st.header('Settings')
-    api_url_in = st.text_input('API URL', DEFAULT_API)
-    api_base = api_url_in.rstrip('/')
-    
+    api_url = st.text_input('API URL', API)
+    api_url = api_url.rstrip('/')
     model = st.selectbox('Model', ['kw', 'tfidf'], index=0, help='kw = keyword baseline; tfidf = cosine similarity')
     k = st.slider('Top-K', 1, 10, 5)
-    
-    diet_labels = {
-        'none': 'none',
-        'keto': 'keto',
-        'vegan': 'vegan',
-        'vegetarian': 'vegetarian',
-        'gluten_free': 'gluten_free',
-    }
-    diet_label = st.selectbox('Diet', list(diet_labels.keys()), index=0)
-    diet_value = diet_labels[diet_label]
-    
+    diet = st.selectbox('Diet', ['none','keto','vegan','vegetarian','gluten_free'], index=0)
     must = st.text_input('Must-include ingredients (comma-separated)', '')
     
-col1, col2 = st.columns([1, 3])
-with col1:
     if st.button('Check API'):
-        url = f'{api_base}/health'
+        url = f'{api_url}/health'
         try:
-            r = httpx.get(url, timeout=3.0)
-            st.success('GET {url} → {r.status_code} {r.text[:100]}')
+            with httpx.Client(timeout=5.0) as client:
+                r = client.get(url)
+            st.success(f'GET {url} → {r.status_code} {r.text[:120]}')
         except Exception as e:
-            st.error(f'Health check failed for {url!r}: {e!r}')
+            st.error(f'Health check failed: {e}')
     
 q = st.text_input('Your query (EN or ES)', 'quick vegan pasta with tomatoes')
 run = st.button('Search')
@@ -55,42 +43,46 @@ run = st.button('Search')
 def call_api():
     payload = {
         'query': q.strip(),
-        'diet': diet_value,
+        'diet': diet,
         'must_include': [m.strip() for m in must.split(',') if m.strip()],
         'k': k,
         'model': model,
         'language': 'auto',
     }
-    url = f'{api_base}/recommend'
+    url = f'{api_url}/recommend'
     t0 = time.perf_counter()
+    url = f'{api_url}/recommend'
     with httpx.Client(timeout=5.0) as client:
-        r = client.post(f'{url}/recommend', json=payload)
+        r = client.post(url, json=payload)
     dt_ms = int((time.perf_counter() - t0) * 1000)
-    return r, dt_ms, payload
+    return url, r, dt_ms, payload
 
 if run:
     if not q.strip():
-        st.warning('Please enter a query.')
+        st.warning('Type a query first.')
     else:
         try:
-            r, dt_ms, payload = call_api()
+            url, payload, r, dt_ms = call_api()
+            st.info(f'POST {url} → {r.status_code}')
+            
+            # Expandable debug panel with payload & first part of response
+            with st.expander('Debug request', expanded=False):
+                st.code(f'POST {url}\n\nPayload:\n{payload}', language='bash')
+                st.write('Status:', r.status_code)
+                st.text(r.text[:800])
+
             if r.status_code == 200:
                 data = r.json()
-                st.success(f"{len(data['results'])} results • server {data['latency_ms']} ms • client {dt_ms} ms • model {data['used_model']}")
+                st.success(f'{len(data['results'])} results • server {data['latency_ms']} ms • client {dt_ms} ms • model {data['used_model']}')
                 for i, rec in enumerate(data['results'], start=1):
                     with st.container(border=True):
-                        st.markdown(f"**{i}. {rec['title']}** \nScore: `{rec['score']:.3f}`")
+                        st.markdown(f'**{i}. {rec['title']}**  \nScore: `{rec['score']:.3f}`')
                         if rec.get('url'):
                             st.write(rec['url'])
                         if rec.get('reasons'):
-                            st.caption(" • ".join(rec["reasons"]))
+                            st.caption(' • '.join(rec['reasons']))
             else:
-                try:
-                    err = r.json()
-                except Exception:
-                    err = {'details': r.text}
-                st.error(f'Error {r.status_code}: {err}')
+                st.error(f'Error {r.status_code}')
         except Exception as e:
-            st.error(f'Request failed: {e}')
-            st.caption('is the API running at the URL provided?')
-            
+            st.error(f'API request failed: {e}')
+            st.caption('Is the API URL correct and running?')
