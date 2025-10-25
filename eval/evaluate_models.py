@@ -5,6 +5,7 @@ from typing import List, Optional, Tuple
 
 from app.ranker.baselines import recommend_popularity, recommend_keyword
 from app.ranker.tfidf import TfidfIndex
+from app.ranker.embeddings import recommend_embed
 
 GOLD_PATH = Path('eval/gold_set.jsonl')
 
@@ -30,8 +31,10 @@ def run_eval(model: str, tfidf_suffix: Optional[str]=None) -> Tuple[float,float,
                 preds = recommend_popularity(q, diet='none', must_include=[], k=5)
             elif model == 'kw':
                 preds = recommend_keyword(q, diet='none', must_include=[], k=5)
-            else:
+            elif model == 'tfidf':
                 preds = tfidf.recommend(q, diet='none', must_include=[], k=5)
+            else:
+                preds = recommend_embed(q, diet='none', must_include=[], k=5)
             lat_ms = (time.perf_counter() - t0) * 1000.0
             latencies.append(lat_ms)
             pred_ids = [p['id'] for p in preds]
@@ -45,7 +48,7 @@ def run_eval(model: str, tfidf_suffix: Optional[str]=None) -> Tuple[float,float,
 
 def main():
     rows = []
-    for name in [('pop', None), ('kw', None), ('tfidf','v1'), ('tfidf','uni')]:
+    for name in [('pop', None), ('kw', None), ('tfidf','v1'), ('tfidf','uni'), ('embed', None)]:
         m, sfx = name
         p, r, p50, p95 = run_eval(m, sfx)
         tag = m if sfx is None else f'{m}:{sfx}'

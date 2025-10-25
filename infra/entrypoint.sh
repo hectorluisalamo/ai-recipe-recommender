@@ -2,6 +2,8 @@
 set -eu
 set -x  # debug: echo commands so we can see failing lines
 
+echo "[entrypoint] booting..."
+
 # Choose data dir: /data if it exists (paid disk), else /tmp (free tier)
 DATA_DIR="/data"
 if [ ! -d "$DATA_DIR" ]; then
@@ -21,10 +23,11 @@ if [ ! -f "${DATA_DIR}/recipes.db" ]; then
       cp /app/data/recipes.db "${DATA_DIR}/recipes.db"
     fi
   fi
+  export DB_URL="${DB_URL:=sqlite:////${DATA_DIR}/recipes.db}"
+else
+  export DB_URL="${DB_URL:=sqlite:////${DATA_DIR}/recipes.db}"
 fi
 
-# Default DB_URL if not provided
-: "${DB_URL:=sqlite:////${DATA_DIR}/recipes.db}"
-export DB_URL
+echo "[entrypoint] DB_URL=$DB_URL"
 
 exec "$@"

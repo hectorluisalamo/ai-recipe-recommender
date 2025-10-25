@@ -3,78 +3,95 @@ import pandas as pd
 import re
 from pathlib import Path
 
-DB_PATH = Path('data/recipes.db')
-SCHEMA_PATH = Path('app/db/schema.sql')
-CSV_PATH = Path('data/recipes_sample.csv')
+DB_PATH = Path("data/recipes.db")
+CSV_PATH = Path("data/recipes_sample.csv")
 
-# --- basic cleaners ---
-PUNCT_RE = re.compile(r'[^\w\s;]')  # keep word chars, whitespace, and semicolons
-
-def normalize_text(s: str) -> str:
-    s = s or ''
-    s = s.lower().strip()
-    s = re.sub(r'\s+', ' ', s)
-    s = PUNCT_RE.sub('', s)
-    return s
-
-# collapse some ingredient synonyms; expand as needed
-SYNONYMS = {
-    'aji amarillo': 'aji amarillo',
-    'aji limon': 'limon aji',
-    'chile': 'chili',
+PUNCT_RE = re.compile(r"[^\w\s;]")
+VALID_DIETS = {"none","keto","vegan","vegetarian","gluten_free"}
+DIET_MAP = {
+    "gluten-free": "gluten_free",
+    "gluten free": "gluten_free",
+    "gf": "gluten_free",
+    "veg": "vegetarian",
+    "vegetarian": "vegetarian",
+    "vegan": "vegan",
+    "keto": "keto",
+    "none": "none",
+    "omnivore": "none",
+    "paleo": "none",
+    "regular": "none",
 }
 
-VALID_DIETS = {'none','keto','vegan','vegetarian','gluten_free'}
+def normalize_text(s: str) -> str:
+    s = s or ""
+    s = s.lower().strip()
+    s = re.sub(r"\s+", " ", s)
+    s = PUNCT_RE.sub("", s)
+    return s
 
 def normalize_ingredients(s: str) -> str:
-    # accept comma or semicolon; output semicolon-separated
-    parts = re.split(r'[;,]', s.lower())
+    parts = re.split(r"[;,]", (s or "").lower())
     norm = []
     for p in parts:
         p = p.strip()
-        if not p:
-            continue
-        p = SYNONYMS.get(p, p)
+        if not p: continue
+        p = p.replace("aji limon", "limon aji").replace("chile", "chili")
         norm.append(p)
-    return '; '.join(norm)
+    return "; ".join(norm)
+
+def normalize_diet(x) -> str:
+    if x is None or (isinstance(x, float) and pd.isna(x)):
+        return "none"
+    s = str(x).strip().lower().replace("-", " ")
+    s = re.sub(r"\s+", " ", s)
+    s = DIET_MAP.get(s, s).replace(" ", "_")
+    return s if s in VALID_DIETS else "none"
 
 def main():
-    print(f'Loading CSV: {CSV_PATH}')
+    print(f"Loading CSV: {CSV_PATH}")
     df = pd.read_csv(CSV_PATH)
-    # standardize columns
-    df['title_norm'] = df['title'].map(normalize_text)
-    df['desc_norm'] = df['description'].fillna('').map(normalize_text)
-    df['ingredients'] = df['ingredients'].map(normalize_ingredients)
-    # ensure diet labels valid
-    valid_diets = {'none','keto','vegan','vegetarian','gluten_free'}
-    bad = set(df['diet']) - valid_diets
-    if bad:
-        raise ValueError(f'Invalid diet labels found: {bad}')
-    df['diet'] = df['diet'].astype(str).str.strip().str.lower().str.replace('-', '_', regex=False)
-    bad_rows = df.loc[~df['diet'].isin(VALID_DIETS), ['id','diet','title']]
-    if not bad_rows.empty: 
-        raise ValueError(
-            'Invalid diet labels found (expect one of '
-            f'{sorted(VALID_DIETS)}). Offenders:\n' + bad_rows.to_string(index=False)
-            )
-    # create DB + schema
+
+    # normalize fields
+    df["title"] = df["title"].map(normalize_text)
+    df["description"] = df["description"].fillna("").map(normalize_text)
+    df["ingredients"] = df["ingredients"].map(normalize_ingredients)
+    df["diet"] = df["diet"].apply(normalize_diet).astype(str).str.strip()
+    df["cuisine"] = df["cuisine"].fillna("").astype(str)
+    df["time_minutes"] = df["time_minutes"].fillna(0).astype(int)
+    df["popularity"] = df["popularity"].fillna(0).astype(int)
+    df["url"] = df["url"].fillna("").astype(str)
+
+    print("[ingest] Diet distribution:", df["diet"].value_counts().to_dict())
+
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     with sqlite3.connect(DB_PATH) as conn:
-        with open(SCHEMA_PATH, 'r', encoding='utf-8') as f:
-            conn.executescript(f.read())
-
-        # upsert: replace on conflict by id
-        df_to_load = df[[
-            'id','title','description','ingredients','cuisine','diet','time_minutes','popularity','url'
-        ]].copy()
-
-        df_to_load.to_sql('recipes', conn, if_exists='append', index=False)
-        # create basic indexes to speed later queries
-        conn.execute('CREATE INDEX IF NOT EXISTS idx_recipes_cuisine ON recipes(cuisine)')
-        conn.execute('CREATE INDEX IF NOT EXISTS idx_recipes_diet ON recipes(diet)')
-        conn.execute('CREATE INDEX IF NOT EXISTS idx_recipes_popularity ON recipes(popularity)')
+        cur = conn.cursor()
+        rows = []
+        for _, r in df.iterrows():
+            diet = r["diet"]
+            if diet not in VALID_DIETS:
+                diet = "none"
+            rows.append((
+                str(r["id"]),
+                str(r["title"]),
+                str(r["description"]),
+                str(r["ingredients"]),
+                str(r["cuisine"]),
+                diet,
+                int(r["time_minutes"]),
+                int(r["popularity"]),
+                str(r["url"]),
+            ))
+        cur.executemany("""
+            INSERT INTO recipes (id, title, description, ingredients, cuisine, diet, time_minutes, popularity, url)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, rows)
+        # indexes (idempotent)
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_recipes_cuisine ON recipes(cuisine)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_recipes_diet ON recipes(diet)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_recipes_popularity ON recipes(popularity)")
         conn.commit()
-    print(f'Ingested {len(df)} recipes into {DB_PATH}')
-    
-    if __name__ == '__main__':
-        main()
+    print(f"Ingested {len(rows)} recipes into {DB_PATH}")
+
+if __name__ == "__main__":
+    main()

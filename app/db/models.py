@@ -19,7 +19,6 @@ recipes = Table(
     Column('time_minutes', Integer, nullable=False),
     Column('popularity', Integer, nullable=False, server_default='0'),
     Column('url', String, nullable=False, unique=True),
-    CheckConstraint("diet IN ('none', 'keto', 'vegetarian', 'vegan', 'gluten-free')", name='ck_recipes_diet'),
 )
 
 feedback = Table(

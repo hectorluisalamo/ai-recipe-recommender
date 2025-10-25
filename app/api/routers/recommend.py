@@ -1,50 +1,41 @@
-from typing import List, Literal, Optional, Annotated
 import asyncio, time
+import structlog
 
 from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel, Field, StringConstraints, ValidationError
+from pydantic import ValidationError
+
+from app.api.schemas import RecommendRequest, RecommendResponse, RecipeOut, ModelName
     
 from app.metrics.prom import REQUESTS, ERRORS, LATENCY
 from app.ranker.tfidf import TfidfIndex
 from app.ranker.baselines import recommend_popularity, recommend_keyword
+from app.ranker.embeddings import recommend_embed
 
+log = structlog.get_logger()
 router = APIRouter(prefix='/recommend', tags=['recommend'])
 
-Diet = Literal['none','keto','vegan','vegetarian','gluten_free']
-Lang = Literal['auto','en','es']
-ModelName = Literal['pop','kw','tfidf']
-
-class RecommendRequest(BaseModel):
-    query: Annotated[str, Field(strip_whitespace=True, min_length=2, max_length=200)]
-    diet: Diet = 'none'
-    must_include: List[Annotated[str, Field(strip_whitespace=True, min_length=1, max_length=40)]] = Field(default_factory=list, max_length=5)
-    k: int = Field(default=5, ge=1, le=10)
-    language: Lang = 'auto'
-    model: ModelName = 'kw'
-
-class RecipeOut(BaseModel):
-    id: str
-    title: str
-    reasons: List[str]
-    score: float
-    url: Optional[str] = None
-
-class RecommendResponse(BaseModel):
-    results: List[RecipeOut]
-    latency_ms: int
-    used_model: str
-
-async def _recommend_core(req: RecommendRequest) -> RecommendResponse:
+async def _recommend_core(req: RecommendRequest, request:Request) -> RecommendResponse:
     t0 = time.perf_counter()
     REQUESTS.labels(endpoint='recommend', model=req.model, diet=req.diet).inc()
 
     async def _run():
-        if req.model == 'tfidf':
+        req_id = getattr(getattr(request, 'state', object()), 'request_id', 'n/a')
+        if req.model == 'embed':
+            try:
+                results_raw = recommend_embed(req.query, req.diet, req.must_include, req.k)
+                used = 'embed_miniLM_multilingual_v1'
+            except Exception as e:
+                # soft-fail to keyword baseline
+                ERRORS.labels(type='embed_fallback').inc()
+                log.error("embed_failed_fallback_kw", request_id=req_id, error=str(e))
+                results_raw = recommend_keyword(req.query, req.diet, req.must_include, req.k)
+                used = "embed_fallback_kw"
+        elif req.model == 'tfidf':
             global _TFIDF_INDEX
             try:
                 _TFIDF_INDEX
             except NameError:
-                _TFIDF_INDEX = TfidfIndex.load('v1')
+                _TFIDF_INDEX = TfidfIndex.load()
             results_raw = _TFIDF_INDEX.recommend(req.query, req.diet, req.must_include, req.k)
             used = 'tfidf_v1'
         elif req.model == 'kw':
@@ -56,15 +47,18 @@ async def _recommend_core(req: RecommendRequest) -> RecommendResponse:
         return used, results_raw
 
     try:
-        used, results_raw = await asyncio.wait_for(_run(), timeout=2.0)
+        used, results_raw = await asyncio.wait_for(_run(), timeout=5.0)
     except asyncio.TimeoutError:
-        raise HTTPException(status_code=504, detail='ranker timed out')
-    except ValidationError as e:
+        raise HTTPException(status_code=504, detail={'error': 'timeout', 'details': 'ranker timed out'})
+    except ValidationError as ve:
         ERRORS.labels(type='invalid_input').inc()
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception:
+        raise HTTPException(status_code=400, detail={'error': 'invalid_input', 'details': str(ve)})
+    except HTTPException:
+        raise
+    except Exception as e:
         ERRORS.labels(type='internal').inc()
-        raise HTTPException(status_code=500, detail='internal server error')
+        log.error('recommend_error', error=str(e), exc_info=True)
+        raise HTTPException(status_code=500, detail={'error': 'internal_error', 'details': 'unexpected error'})
 
     latency_ms = int((time.perf_counter() - t0) * 1000)
     LATENCY.labels(endpoint='recommend', model=req.model).observe(latency_ms / 1000.0)
@@ -72,6 +66,6 @@ async def _recommend_core(req: RecommendRequest) -> RecommendResponse:
     results = [RecipeOut(**r) for r in results_raw]
     return RecommendResponse(results=results, latency_ms=latency_ms, used_model=used)
 
-@router.post('')
+@router.post('', response_model=RecommendResponse)
 async def recommend(req: RecommendRequest, request: Request) -> RecommendResponse:
-    return await _recommend_core(req)
+    return await _recommend_core(req, request)

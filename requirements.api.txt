@@ -11,3 +11,7 @@ joblib==1.4.2
 structlog==24.1.0
 prometheus-client==0.20.0
 prometheus-fastapi-instrumentator==6.1.0
+sentence-transformers==3.1.1
+psycopg[binary]==3.2.*
+psycopg_pool==3.2.*
+pydantic-settings>=2.0

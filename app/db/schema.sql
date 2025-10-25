@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS recipes (
   description TEXT,
   ingredients TEXT NOT NULL,   -- semicolon-separated
   cuisine TEXT,
-  diet TEXT CHECK (diet IN ('none','keto','vegan','vegetarian','gluten_free')) DEFAULT 'none',
+  diet TEXT,
   time_minutes INTEGER,
   popularity INTEGER,
   url TEXT

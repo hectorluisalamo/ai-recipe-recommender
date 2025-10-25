@@ -24,3 +24,20 @@ def list_recipes(diet: Optional[str] = None, limit: int = 10) -> List[Dict[str, 
     with _engine.begin() as conn:
         rows = conn.execute(text(query), params).mappings().all()
         return [dict(r) for r in rows]
+    
+def list_recipes_by_ids(ids: List[str]) -> List[Dict[str, Any]]:
+    if not ids:
+        return []
+    # preserve order using CASE
+    placeholders = ', '.join([f':id{i}' for i,_ in enumerate(ids)])
+    ordering = ' '.join([f'WHEN :id{i} THEN {i}' for i,_ in enumerate(ids)])
+    params = {f'id{i}': v for i,v in enumerate(ids)}
+    query = f'''
+      SELECT id, title, ingredients, cuisine, diet, time_minutes, popularity, url
+      FROM recipes
+      WHERE id IN ({placeholders})
+      ORDER BY CASE id {ordering} END
+    '''
+    with _engine.begin() as conn:
+        rows = conn.execute(text(query), params).mappings().all()
+        return [dict(r) for r in rows]

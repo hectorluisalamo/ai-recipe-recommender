@@ -12,7 +12,7 @@ with st.sidebar:
     st.header('Settings')
     api_url = st.text_input('API URL', API)
     api_url = api_url.rstrip('/')  # avoid //recommend
-    model = st.selectbox('Model', ['kw', 'tfidf'], index=0, help='kw = keyword baseline; tfidf = cosine similarity')
+    model = st.selectbox('Model', ['embed', 'kw', 'tfidf'], index=0, help='embed = multilingual semantic; kw = keyword; tfidf = cosine')
     k = st.slider('Top-K', 1, 10, 5)
     diet = st.selectbox('Diet', ['none', 'keto', 'vegan', 'vegetarian', 'gluten_free'], index=0)
     must = st.text_input('Must-include ingredients (comma-separated)', '')

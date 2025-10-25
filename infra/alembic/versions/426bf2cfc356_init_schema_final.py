@@ -39,7 +39,6 @@ def upgrade() -> None:
     sa.Column('time_minutes', sa.Integer(), nullable=False),
     sa.Column('popularity', sa.Integer(), server_default='0', nullable=False),
     sa.Column('url', sa.String(), nullable=False),
-    sa.CheckConstraint("diet IN ('none', 'keto', 'vegetarian', 'vegan', 'gluten-free')", name='ck_recipes_diet'),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('url')
     )
