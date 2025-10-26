@@ -1,69 +1,72 @@
 # *AI Recipe Recommender* 🍳
 
-Bilingual (EN/ES) recipe search with diet filters. Ships a FastAPI service with Prometheus metrics and a Streamlit demo UI.
+Top-K recipes from natural-language queries (EN/ES) with brief “reasons”. Models: **pop**, **kw**, **tfidf**, **embed**.
 
 **Live demo:** <https://recipe-ui-4ip2.onrender.com>  
 **API base:** <https://recipe-api-81x3.onrender.com>  
 
+> Targets: Prec@5 ≥ 0.60 · p95 ≤ 300 ms (@ ~1k recipes) · ≤ $10/mo · 99% weekly uptime
+
 ## Quickstart (local)
 
 bash
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-# seed data + model
-python app/db/ingest.py
-python app/ranker/fit_index.py --fields title+ingredients --ngrams 1,2 --suffix v1
-# run API
-python -m uvicorn app.api.main:app --reload --port 8000
-# run UI
-streamlit run ui/app.py
+python3 -m venv .venv && source .venv/bin/activate \
+pip install -r requirements.txt \
+python -m uvicorn app.api.main:app --reload --port 8000 
+
+* Health: http://127.0.0.1:8000/health
+* Docs: http://127.0.0.1:8000/docs
 
 ## API (Schemas + cURL)
 
-{
-  "query": "quick vegan pasta with tomatoes",
-  "diet": "vegan",
-  "must_include": [],
-  "k": 5,
-  "language": "auto",
-  "model": "kw"
+{ \
+  "query": "quick vegan pasta with tomatoes", \
+  "diet": "vegan", \
+  "must_include": [], \
+  "k": 5, \
+  "language": "auto", \
+  "model": "kw" \
 }
 
-curl -sX POST <https://recipe-api-81x3.onrender.com>/recommend \
- -H 'Content-Type: application/json' \
- -d '{"query":"quick vegan pasta with tomatoes","diet":"vegan","k":5,"model":"kw"}'
+Returns: results[{id,title,reasons[],score,url}], latency_ms, used_model.
 
-Health: GET /health → {"status":"ok","version":"x.y.z"}
-Metrics: GET /metrics (Prometheus exposition)
-
-## Metrics (sample)
-
-Variant     Prec@5	    MRR	    p50ms  p95ms	Notes
-pop	        0.12	    0.33	0.1	    0.1     popularity baseline
-kw	        0.20	    0.90    0.1	    0.1     default model
-tfidf:v1	0.20	    0.90	0.3     0.3     cosine sim
-tfidf:uni	0.20	    0.90	0.2	    0.3	    ablation
-
-Cost (est.): <$10/mo on free tiers; p95 <= 300 ms (1k recipes)
+Helpful:
+* GET /health → {"status":"ok","version":"x.y.z"}
+* GET /catalog/count → {"count": N}
 
 ## Architecture
 
+```mermaid
 flowchart LR
-  A[Streamlit UI] -->|JSON| B(FastAPI Service)
-  B --> C{{Ranker\nkw | tfidf}}
-  B --> D[(SQLite on Disk)]
-  C --> D
-  B --> E[/Prometheus /metrics/]
-  B --> F{Validation\nPydantic}
+  A[Streamlit/Web] -->|JSON| B(FastAPI API)
+  B --> C{Ranker}
+  C -->|pop/kw/tfidf| D[(SQLite: recipes)]
+  C -->|embed→ids| G[(Postgres: pgvector)]
+  G -->|top ids| H[[Hydrate by ids]]
+  H --> D
+  C --> I[Diet & must_include filters]
+  I --> J[[Top-K results]]
+  B --> E[/Metrics & Logs/]
+  B --> F{Lang Detect}
+  F --> C
+  B --> K[[/health, /feedback]]
+  ```
+
+## Models
+
+* pop — diet filter + must-include → sort by popularity
+* kw — token overlap (title + ingredients) + popularity tie-break
+* tfidf — cosine over TF-IDF vectors (title+ingredients)
+* embed — semantic search using embeddings (MiniLM) + ANN index (FAISS/pgvector).
 
 ## Repo layout
 
-app/ (api/, ranker/, db/, metrics/)
-data/ (sample csv + db)
-models/ (tfidf artifacts)
-ui/ (streamlit)
-infra/ (entrypoint.sh, render.yaml)
-tests/
+app/ (api/, ranker/, db/, metrics/) \
+data/ (sample csv + db) \
+models/ (tfidf artifacts) \
+ui/ (streamlit) \
+infra/ (entrypoint.sh, render.yaml) \
+tests/ \
 eval/
 
 ## License & Data
