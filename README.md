@@ -71,6 +71,8 @@ eval/
 
 ## License & Data
 
+MIT
+
 ## Next Steps
 
 - Expand dataset + bilingual recall.
