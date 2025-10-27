@@ -1,4 +1,4 @@
-import asyncio, time
+import os, asyncio, time
 import structlog
 
 from fastapi import APIRouter, HTTPException, Request
@@ -7,9 +7,10 @@ from pydantic import ValidationError
 from app.api.schemas import RecommendRequest, RecommendResponse, RecipeOut, ModelName
     
 from app.metrics.prom import REQUESTS, ERRORS, LATENCY
-from app.ranker.tfidf import TfidfIndex
 from app.ranker.baselines import recommend_popularity, recommend_keyword
 from app.ranker.embeddings import recommend_embed
+
+TFIDF_ENABLED = os.getenv('TFIDF_ENABLED', '1') == '1'
 
 log = structlog.get_logger()
 router = APIRouter(prefix='/recommend', tags=['recommend'])
@@ -31,6 +32,9 @@ async def _recommend_core(req: RecommendRequest, request:Request) -> RecommendRe
                 results_raw = recommend_keyword(req.query, req.diet, req.must_include, req.k)
                 used = "embed_fallback_kw"
         elif req.model == 'tfidf':
+            if not TFIDF_ENABLED:
+                raise HTTPException(status_code=503, detail={"error":"unavailable","details":"tfidf disabled in this environment"})
+            from app.ranker.tfidf import TfidfIndex
             global _TFIDF_INDEX
             try:
                 _TFIDF_INDEX
